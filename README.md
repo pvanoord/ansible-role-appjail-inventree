@@ -42,9 +42,10 @@ The old upstream InvenTree AJSPEC references an unavailable image host. This
 repository instead builds its own FreeBSD-native OCI image from the upstream
 InvenTree `build.makejail` dependency list and pinned application source. It
 does not use the Linux Docker image. The OCI image uses FreeBSD's Python 3.12
-packages, matching the current FreeBSD ports default. LLVM/Clang is installed
-to compile Python dependencies such as `cffi` and `cryptography` that do not
-provide compatible prebuilt wheels.
+packages, matching the current FreeBSD ports default. The FreeBSD base
+development package set supplies the system headers and compiler needed to
+build Python dependencies such as `cffi` and `cryptography` that do not provide
+compatible prebuilt wheels.
 
 The workflow in `.github/workflows/build-inventree-image.yml` builds on a
 FreeBSD 15.1 runner and builds from an `inventree-freebsd` context so dbuild

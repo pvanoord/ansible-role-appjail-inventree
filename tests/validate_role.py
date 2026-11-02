@@ -212,8 +212,8 @@ def main() -> int:
         errors.append("Image must set inventree's HOME before running pip as that user")
     if 'ENV HOME=/inventree \\\n    PATH=' not in containerfile:
         errors.append("Image runtime must preserve the writable inventree HOME")
-    if "        llvm \\\n" not in containerfile or "ENV CC=clang" not in containerfile:
-        errors.append("Image must install LLVM and set Clang as the Python package build compiler")
+    if "FreeBSD-set-devel" not in containerfile or "ENV CC=cc" not in containerfile:
+        errors.append("Image must install FreeBSD development headers and use the base C compiler")
     worker = (ROOT / "image/run-worker.sh").read_text(encoding="utf-8")
     if "python3.12 manage.py qcluster" not in worker:
         errors.append("InvenTree worker must run with the image's Python 3.12 interpreter")

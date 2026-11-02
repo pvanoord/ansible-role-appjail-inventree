@@ -29,7 +29,7 @@ RUN set -eux; \
         py312-sqlite3 \
         py312-xmlsec \
         python312 \
-        llvm \
+        FreeBSD-set-devel \
         rust \
         xorg-fonts; \
     pkg query '%dn-%dv' py312-pillow | xargs -J % pkg set -y -A0 %; \
@@ -59,7 +59,7 @@ RUN set -eux; \
 USER inventree
 
 ENV HOME=/inventree
-ENV CC=clang
+ENV CC=cc
 
 RUN set -eux; \
     python3.12 -m ensurepip --default-pip; \
