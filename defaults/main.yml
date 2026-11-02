@@ -37,7 +37,7 @@ appjail_inventree_cache_jail_name: inventree-redis
 appjail_inventree_proxy_jail_name: inventree-nginx
 
 # InvenTree OCI image
-appjail_inventree_oci_image: ghcr.io/itisit/inventree-freebsd
+appjail_inventree_oci_image: ghcr.io/pvanoord/inventree-freebsd
 appjail_inventree_oci_tag: "15.1"
 
 # Makejail sources

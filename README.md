@@ -7,7 +7,7 @@ Production-oriented deployment of InvenTree on a FreeBSD AppJail host. The role 
 - **Redis** cache / job queue;
 - **Nginx** reverse proxy and static/media server.
 
-InvenTree runs from a FreeBSD-native OCI image built by this repository and hosted at `ghcr.io/itisit/inventree-freebsd`. MariaDB, Redis and Nginx remain separate AppJail services. SQLite is deliberately not supported by this role.
+InvenTree runs from a FreeBSD-native OCI image built by this repository and hosted at `ghcr.io/pvanoord/inventree-freebsd`. MariaDB, Redis and Nginx remain separate AppJail services. SQLite is deliberately not supported by this role.
 
 ## What the role manages
 
@@ -45,7 +45,7 @@ does not use the Linux Docker image.
 
 The workflow in `.github/workflows/build-inventree-image.yml` builds on a
 FreeBSD 15.1 runner and builds from an `inventree-freebsd` context so dbuild
-publishes `ghcr.io/itisit/inventree-freebsd:15.1` when image files are pushed
+publishes `ghcr.io/pvanoord/inventree-freebsd:15.1` when image files are pushed
 to `main`. Changes to the dbuild configuration also trigger a rebuild. Pull
 requests build without publishing.
 After the first successful push, set the GHCR package visibility to **Public**
@@ -55,7 +55,7 @@ cannot pull it anonymously.
 Once the package is public, deploy with the defaults or set:
 
 ```yaml
-appjail_inventree_oci_image: ghcr.io/itisit/inventree-freebsd
+appjail_inventree_oci_image: ghcr.io/pvanoord/inventree-freebsd
 appjail_inventree_oci_tag: "15.1"
 ```
 
@@ -212,7 +212,7 @@ ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass
 | `appjail_inventree_fqdn` | required | Nginx `server_name`. |
 | `appjail_inventree_public_url` | required | Canonical InvenTree URL and trusted origin. |
 | `appjail_inventree_expose` | `8080:80` | Host-to-jail HTTP port mapping. |
-| `appjail_inventree_oci_image` | `ghcr.io/itisit/inventree-freebsd` | Public GHCR image name. |
+| `appjail_inventree_oci_image` | `ghcr.io/pvanoord/inventree-freebsd` | Public GHCR image name. |
 | `appjail_inventree_oci_tag` | `15.1` | FreeBSD release/image tag. |
 | `appjail_inventree_language` | `nl-NL` | InvenTree language. |
 | `appjail_inventree_timezone` | `Europe/Amsterdam` | Application timezone. |

@@ -31,11 +31,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
-          DBUILD_REGISTRY: ghcr.io/itisit
+          DBUILD_REGISTRY: ghcr.io/pvanoord
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         with:
           release: "15.1"
-          arch: x86-64
           sync: rsync
           usesh: true
           envs: GITHUB_TOKEN GITHUB_ACTOR DBUILD_REGISTRY GITHUB_EVENT_NAME

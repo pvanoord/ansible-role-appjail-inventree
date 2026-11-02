@@ -64,7 +64,7 @@ def main() -> int:
         "appjail_inventree_db_jail_name": "inventree-mariadb",
         "appjail_inventree_cache_jail_name": "inventree-redis",
         "appjail_inventree_proxy_jail_name": "inventree-nginx",
-        "appjail_inventree_oci_image": "ghcr.io/itisit/inventree-freebsd",
+        "appjail_inventree_oci_image": "ghcr.io/pvanoord/inventree-freebsd",
         "appjail_inventree_oci_tag": "15.1",
         "appjail_inventree_mariadb_makejail": "gh+AppJail-makejails/mariadb",
         "appjail_inventree_redis_makejail": "gh+AppJail-makejails/redis",
@@ -147,7 +147,7 @@ def main() -> int:
             assert env_values["EXTRA_INVENTREE_LOG_LEVEL"] == "WARNING"
 
             makejail = render("inventree-oci.Makejail.j2", context)
-            assert "ARG inventree_from=ghcr.io/itisit/inventree-freebsd" in makejail
+            assert "ARG inventree_from=ghcr.io/pvanoord/inventree-freebsd" in makejail
             assert "ARG inventree_tag=15.1" in makejail
             render("appjail.conf.j2", context)
             render("resolv.conf.j2", context)
@@ -196,6 +196,8 @@ def main() -> int:
         errors.append("Image workflow must rebuild when .daemonless/config.yaml changes")
     if "cd /tmp/inventree-freebsd" not in workflow:
         errors.append("Image workflow must build from the inventree-freebsd directory")
+    if "arch: x86-64" in workflow:
+        errors.append("Image workflow must use the FreeBSD VM action's default x86_64 architecture")
 
     if errors:
         print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)
