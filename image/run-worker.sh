@@ -2,4 +2,4 @@
 set -eu
 
 cd /inventree/src/src/backend/InvenTree
-exec python3.11 manage.py qcluster
+exec python3.12 manage.py qcluster

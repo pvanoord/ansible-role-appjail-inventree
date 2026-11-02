@@ -21,18 +21,18 @@ RUN set -eux; \
         pango \
         poppler-utils \
         pkgconf \
-        py311-invoke \
-        py311-mysqlclient \
-        py311-pillow \
-        py311-pynacl \
-        py311-psycopg2 \
-        py311-sqlite3 \
-        py311-xmlsec \
-        python311 \
+        py312-invoke \
+        py312-mysqlclient \
+        py312-pillow \
+        py312-pynacl \
+        py312-psycopg2 \
+        py312-sqlite3 \
+        py312-xmlsec \
+        python312 \
         rust \
         xorg-fonts; \
-    pkg query '%dn-%dv' py311-pillow | xargs -J % pkg set -y -A0 %; \
-    pkg delete -y py311-pillow; \
+    pkg query '%dn-%dv' py312-pillow | xargs -J % pkg set -y -A0 %; \
+    pkg delete -y py312-pillow; \
     fetch -o /tmp/makejails.tar.gz \
         "https://github.com/AppJail-makejails/inventree/archive/${UPSTREAM_COMMIT}.tar.gz"; \
     mkdir -p /tmp/makejails; \
@@ -58,9 +58,9 @@ RUN set -eux; \
 USER inventree
 
 RUN set -eux; \
-    python3.11 -m ensurepip --default-pip; \
-    python3.11 -m pip install --upgrade pip; \
-    python3.11 -m pip install -r /inventree/src/src/backend/requirements.txt
+    python3.12 -m ensurepip --default-pip; \
+    python3.12 -m pip install --upgrade pip; \
+    python3.12 -m pip install -r /inventree/src/src/backend/requirements.txt
 
 USER root
 

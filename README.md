@@ -41,7 +41,8 @@ The defaults use `appjail-devel`, because the AppJail Makejail collection target
 The old upstream InvenTree AJSPEC references an unavailable image host. This
 repository instead builds its own FreeBSD-native OCI image from the upstream
 InvenTree `build.makejail` dependency list and pinned application source. It
-does not use the Linux Docker image.
+does not use the Linux Docker image. The OCI image uses FreeBSD's Python 3.12
+packages, matching the current FreeBSD ports default.
 
 The workflow in `.github/workflows/build-inventree-image.yml` builds on a
 FreeBSD 15.1 runner and builds from an `inventree-freebsd` context so dbuild
