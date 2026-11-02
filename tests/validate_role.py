@@ -206,6 +206,8 @@ def main() -> int:
         errors.append("Image Containerfile must use the currently available Python 3.12 packages")
     if "py312-invoke" not in containerfile or "python3.12 -m pip install" not in containerfile:
         errors.append("Image Containerfile must install dependencies for Python 3.12")
+    if "py312-PyNaCl" not in containerfile or "py312-pynacl" in containerfile:
+        errors.append("Image Containerfile must use the correctly cased FreeBSD PyNaCl package name")
     worker = (ROOT / "image/run-worker.sh").read_text(encoding="utf-8")
     if "python3.12 manage.py qcluster" not in worker:
         errors.append("InvenTree worker must run with the image's Python 3.12 interpreter")

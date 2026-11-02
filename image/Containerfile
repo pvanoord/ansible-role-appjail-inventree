@@ -24,7 +24,7 @@ RUN set -eux; \
         py312-invoke \
         py312-mysqlclient \
         py312-pillow \
-        py312-pynacl \
+        py312-PyNaCl \
         py312-psycopg2 \
         py312-sqlite3 \
         py312-xmlsec \
