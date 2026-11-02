@@ -118,6 +118,15 @@ def main() -> int:
             assert {
                 "INVENTREE_GUNICORN_WORKERS": "3"
             } in app_service["oci"]["environment"]
+            assert {
+                "INVENTREE_STATIC_ROOT": "/inventree/data/static"
+            } in app_service["oci"]["environment"]
+            assert {
+                "INVENTREE_MEDIA_ROOT": "/inventree/data/media"
+            } in app_service["oci"]["environment"]
+            assert {
+                "INVENTREE_BACKUP_DIR": "/inventree/data/backup"
+            } in app_service["oci"]["environment"]
             db_service = director["services"]["db"]
             assert "arguments" not in db_service
             assert db_service["oci"]["environment"] == [

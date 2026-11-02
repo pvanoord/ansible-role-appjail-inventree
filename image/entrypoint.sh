@@ -7,7 +7,8 @@ APP_MARKER=/.inventree-done/skip-initialization
 export INVENTREE_CONFIG_FILE="${APP_CONFIG}"
 export PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/inventree/.local/bin"
 
-mkdir -p /inventree/log /inventree/run /inventree/data/static /inventree/data/media
+mkdir -p /inventree/log /inventree/run /inventree/data/static \
+    /inventree/data/media /inventree/data/backup
 chown inventree:inventree /inventree/log /inventree/run
 cp /usr/local/etc/inventree/config.yaml "${APP_CONFIG}"
 chown inventree:inventree "${APP_CONFIG}"
