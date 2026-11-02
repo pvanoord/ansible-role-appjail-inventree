@@ -1,0 +1,23 @@
+---
+- name: Bootstrap Python on the FreeBSD AppJail host
+  hosts: appjail_hosts
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Install Python when it is not present
+      ansible.builtin.raw: test -x /usr/local/bin/python3.12 || pkg install -y python312
+      register: python_bootstrap
+      changed_when: "'INSTALLED' in python_bootstrap.stdout or 'installed' in python_bootstrap.stdout"
+
+- name: Deploy InvenTree with AppJail
+  hosts: appjail_hosts
+  gather_facts: true
+  become: true
+  roles:
+    - role: ansible-role-appjail-inventree
+      vars:
+        appjail_inventree_fqdn: inventree.intero-integrity.com
+        appjail_inventree_public_url: http://inventree.intero-integrity.com:8080
+        appjail_inventree_expose: "8080:80"
+        appjail_inventree_admin_email: peter.vanoord@intero-integrity.com
+        appjail_inventree_backup_enabled: true

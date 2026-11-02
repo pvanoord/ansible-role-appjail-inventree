@@ -1,0 +1,80 @@
+ARG FREEBSD_RELEASE
+
+FROM ghcr.io/appjail-makejails/core:${FREEBSD_RELEASE}
+
+ARG INVENTREE_VERSION
+ARG UPSTREAM_COMMIT
+
+LABEL org.opencontainers.image.title="InvenTree for FreeBSD AppJail" \
+    org.opencontainers.image.description="FreeBSD-native InvenTree application image for AppJail" \
+    org.opencontainers.image.source="https://github.com/pvanoord/ansible-role-appjail-inventree" \
+    org.opencontainers.image.vendor="pvanoord"
+
+RUN set -eux; \
+    pkg update; \
+    pkg install -y \
+        ca_root_nss \
+        dasel \
+        gettext \
+        libxml2 \
+        libxslt \
+        pango \
+        poppler-utils \
+        pkgconf \
+        py311-invoke \
+        py311-mysqlclient \
+        py311-pillow \
+        py311-pynacl \
+        py311-psycopg2 \
+        py311-sqlite3 \
+        py311-xmlsec \
+        python311 \
+        rust \
+        xorg-fonts; \
+    pkg query '%dn-%dv' py311-pillow | xargs -J % pkg set -y -A0 %; \
+    pkg delete -y py311-pillow; \
+    fetch -o /tmp/makejails.tar.gz \
+        "https://github.com/AppJail-makejails/inventree/archive/${UPSTREAM_COMMIT}.tar.gz"; \
+    mkdir -p /tmp/makejails; \
+    tar -C /tmp/makejails --strip-components=1 -xf /tmp/makejails.tar.gz; \
+    fetch -o /tmp/inventree.tar.gz \
+        "https://github.com/inventree/InvenTree/archive/refs/tags/${INVENTREE_VERSION}.tar.gz"; \
+    mkdir -p /inventree/src /scripts /inventree/init /inventree/data; \
+    tar -C /inventree/src --strip-components=1 -xf /tmp/inventree.tar.gz; \
+    cp /tmp/makejails/files/patch-src-backend-requirements.txt.patch /inventree/src/; \
+    patch -d /inventree/src < /inventree/src/patch-src-backend-requirements.txt.patch; \
+    rm -f /inventree/src/src/backend/requirements.txt.orig \
+        /inventree/src/patch-src-backend-requirements.txt.patch; \
+    cp -R /tmp/makejails/scripts/. /scripts/; \
+    cp -R /tmp/makejails/init/. /inventree/init/; \
+    cp /tmp/makejails/files/dot.profile /inventree/.profile; \
+    cp /tmp/makejails/files/dot.shrc /inventree/.shrc; \
+    pw useradd -n inventree -d /inventree -s /bin/sh; \
+    mkdir -p /usr/local/etc/inventree /inventree/log /inventree/run \
+        /inventree/data/static /inventree/data/media /.inventree-done; \
+    chown -R inventree:inventree /inventree; \
+    rm -rf /tmp/makejails /tmp/makejails.tar.gz /tmp/inventree.tar.gz
+
+USER inventree
+
+RUN set -eux; \
+    python3.11 -m ensurepip --default-pip; \
+    python3.11 -m pip install --upgrade pip; \
+    python3.11 -m pip install -r /inventree/src/src/backend/requirements.txt
+
+USER root
+
+RUN pkg clean -ay; \
+    rm -rf /var/cache/pkg/* /var/db/pkg/repos/*
+COPY image/config.yaml /usr/local/etc/inventree/config.yaml
+COPY image/entrypoint.sh /usr/local/bin/inventree-entrypoint
+COPY image/run-web.sh /usr/local/bin/inventree-run-web
+COPY image/run-worker.sh /usr/local/bin/inventree-run-worker
+
+RUN chmod 0555 /usr/local/bin/inventree-entrypoint \
+        /usr/local/bin/inventree-run-web /usr/local/bin/inventree-run-worker
+
+ENV PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/inventree/.local/bin"
+VOLUME ["/inventree/data"]
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/inventree-entrypoint"]

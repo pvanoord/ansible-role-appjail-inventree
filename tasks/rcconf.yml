@@ -1,0 +1,19 @@
+---
+- name: Read rc.conf value for {{ appjail_inventree_rc_item.key }}
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/sysrc
+      - -n
+      - "{{ appjail_inventree_rc_item.key }}"
+  register: appjail_inventree_rc_current
+  changed_when: false
+  failed_when: appjail_inventree_rc_current.rc not in [0, 1]
+
+- name: Set rc.conf value for {{ appjail_inventree_rc_item.key }}
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/sysrc
+      - "{{ appjail_inventree_rc_item.key }}={{ appjail_inventree_rc_item.value }}"
+  when: appjail_inventree_rc_current.stdout | trim != appjail_inventree_rc_item.value | string
+  changed_when: true
+  notify: "{{ appjail_inventree_rc_item.notify | default([]) }}"

@@ -1,0 +1,42 @@
+---
+- name: Create the backup directory
+  ansible.builtin.file:
+    path: "{{ appjail_inventree_backup_dir }}"
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0700"
+  when: appjail_inventree_backup_enabled | bool
+
+- name: Install the InvenTree backup script
+  ansible.builtin.template:
+    src: backup-inventree.sh.j2
+    dest: /usr/local/sbin/backup-inventree-appjail
+    owner: root
+    group: wheel
+    mode: "0700"
+  no_log: true
+  when: appjail_inventree_backup_enabled | bool
+
+- name: Schedule the InvenTree backup
+  ansible.builtin.cron:
+    name: Backup AppJail InvenTree
+    user: root
+    minute: "{{ appjail_inventree_backup_minute }}"
+    hour: "{{ appjail_inventree_backup_hour }}"
+    job: /usr/local/sbin/backup-inventree-appjail
+    state: present
+  when: appjail_inventree_backup_enabled | bool
+
+- name: Remove the backup schedule when backups are disabled
+  ansible.builtin.cron:
+    name: Backup AppJail InvenTree
+    user: root
+    state: absent
+  when: not appjail_inventree_backup_enabled | bool
+
+- name: Remove the backup script when backups are disabled
+  ansible.builtin.file:
+    path: /usr/local/sbin/backup-inventree-appjail
+    state: absent
+  when: not appjail_inventree_backup_enabled | bool

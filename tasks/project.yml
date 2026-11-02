@@ -1,0 +1,114 @@
+---
+- name: Create project and persistent-volume directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ appjail_inventree_project_dir }}"
+      owner: root
+      group: wheel
+      mode: "0700"
+    - path: "{{ appjail_inventree_project_dir }}/copydir-files/usr/local/etc/nginx"
+      owner: root
+      group: wheel
+      mode: "0755"
+    - path: "{{ appjail_inventree_volume_root }}/inventree/data"
+      owner: "1001"
+      group: "1001"
+      mode: "0750"
+    - path: "{{ appjail_inventree_volume_root }}/inventree/data/static"
+      owner: "1001"
+      group: "1001"
+      mode: "0755"
+    - path: "{{ appjail_inventree_volume_root }}/inventree/data/media"
+      owner: "1001"
+      group: "1001"
+      mode: "0755"
+    - path: "{{ appjail_inventree_volume_root }}/mariadb/db"
+      owner: "88"
+      group: "88"
+      mode: "0750"
+    - path: "{{ appjail_inventree_volume_root }}/mariadb/done"
+      owner: "88"
+      group: "88"
+      mode: "0750"
+
+- name: Create TLS volume directory
+  ansible.builtin.file:
+    path: "{{ appjail_inventree_volume_root }}/nginx/tls"
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0700"
+  when: appjail_inventree_tls_enabled | bool
+
+- name: Remove role-managed TLS material when internal TLS is disabled
+  ansible.builtin.file:
+    path: "{{ appjail_inventree_volume_root }}/nginx/tls"
+    state: absent
+  when: not appjail_inventree_tls_enabled | bool
+
+- name: Install TLS certificate
+  ansible.builtin.copy:
+    src: "{{ appjail_inventree_tls_certificate_src }}"
+    dest: "{{ appjail_inventree_volume_root }}/nginx/tls/{{ appjail_inventree_tls_certificate_name }}"
+    owner: root
+    group: wheel
+    mode: "0644"
+  notify: Restart InvenTree proxy
+  when: appjail_inventree_tls_enabled | bool
+
+- name: Install TLS private key
+  ansible.builtin.copy:
+    src: "{{ appjail_inventree_tls_private_key_src }}"
+    dest: "{{ appjail_inventree_volume_root }}/nginx/tls/{{ appjail_inventree_tls_private_key_name }}"
+    owner: root
+    group: wheel
+    mode: "0600"
+  no_log: true
+  notify: Restart InvenTree proxy
+  when: appjail_inventree_tls_enabled | bool
+
+- name: Render the InvenTree OCI Makejail
+  ansible.builtin.template:
+    src: inventree-oci.Makejail.j2
+    dest: "{{ appjail_inventree_project_dir }}/inventree-oci.Makejail"
+    owner: root
+    group: wheel
+    mode: "0600"
+  notify: Deploy InvenTree stack
+
+- name: Render the Director specification
+  ansible.builtin.template:
+    src: appjail-director.yml.j2
+    dest: "{{ appjail_inventree_project_dir }}/appjail-director.yml"
+    owner: root
+    group: wheel
+    mode: "0600"
+  notify: Deploy InvenTree stack
+
+- name: Render root-only Director environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ appjail_inventree_project_dir }}/.env"
+    owner: root
+    group: wheel
+    mode: "0600"
+  no_log: true
+  notify: Deploy InvenTree stack
+
+- name: Render Nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: >-
+      {{ appjail_inventree_project_dir }}/copydir-files/usr/local/etc/nginx/nginx.conf
+    owner: root
+    group: wheel
+    mode: "0644"
+  notify: Deploy InvenTree stack
+
+- name: Configure optional backups
+  ansible.builtin.import_tasks: backup.yml

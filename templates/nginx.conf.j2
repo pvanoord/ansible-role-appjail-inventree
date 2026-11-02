@@ -1,0 +1,85 @@
+# Managed by Ansible: appjail_inventree
+events {
+    worker_connections 1024;
+}
+
+http {
+    include mime.types;
+    default_type application/octet-stream;
+    server_tokens off;
+    resolver {{ appjail_inventree_dns_address }} valid=30s;
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+
+    map $http_x_forwarded_proto $proxy_x_forwarded_proto {
+        default $http_x_forwarded_proto;
+        '' $scheme;
+    }
+
+{% if appjail_inventree_tls_enabled | bool and appjail_inventree_tls_redirect_http | bool %}
+    server {
+        listen 80;
+        server_name {{ appjail_inventree_fqdn }};
+        return 301 https://$host$request_uri;
+    }
+{% endif %}
+
+    server {
+{% if appjail_inventree_tls_enabled | bool %}
+        listen 443 ssl;
+        ssl_certificate /usr/local/etc/nginx/tls/{{ appjail_inventree_tls_certificate_name }};
+        ssl_certificate_key /usr/local/etc/nginx/tls/{{ appjail_inventree_tls_private_key_name }};
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_session_cache shared:SSL:10m;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+{% else %}
+        listen 80;
+{% endif %}
+        server_name {{ appjail_inventree_fqdn }};
+        client_max_body_size {{ appjail_inventree_client_max_body_size }};
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+        location / {
+            set $endpoint {{ appjail_inventree_jail_name }}:8000;
+            proxy_pass http://$endpoint;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-By $server_addr:$server_port;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $proxy_x_forwarded_proto;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header CLIENT_IP $remote_addr;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_redirect off;
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }
+
+        location /static/ {
+            alias /usr/local/www/inventree/static/;
+            expires 30d;
+            add_header Cache-Control "public";
+        }
+
+        location /media/ {
+            alias /usr/local/www/inventree/media/;
+            auth_request /auth;
+            add_header Content-Disposition "attachment";
+        }
+
+        location = /auth {
+            internal;
+            set $endpoint {{ appjail_inventree_jail_name }}:8000;
+            proxy_pass http://$endpoint/auth/;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_set_header Host $http_host;
+        }
+    }
+}

@@ -1,0 +1,76 @@
+---
+- name: Check whether the Director project exists
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail-director
+      - --env-file
+      - "{{ appjail_inventree_project_dir }}/.env"
+      - check
+      - --project
+      - "{{ appjail_inventree_project }}"
+  register: appjail_inventree_director_project
+  changed_when: false
+  failed_when: false
+
+- name: Request initial deployment when the Director project is absent
+  ansible.builtin.command: /usr/bin/true
+  changed_when: true
+  notify: Deploy InvenTree stack
+  when: appjail_inventree_director_project.rc != 0
+
+- name: Check the expected AppJail services
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail
+      - status
+      - -q
+      - "{{ item }}"
+  loop: "{{ appjail_inventree_service_names }}"
+  register: appjail_inventree_jail_status
+  changed_when: false
+  failed_when: false
+  when: appjail_inventree_director_project.rc == 0
+
+- name: Request reconciliation when an AppJail service is stopped
+  ansible.builtin.command: /usr/bin/true
+  changed_when: true
+  notify: Deploy InvenTree stack
+  when:
+    - appjail_inventree_director_project.rc == 0
+    - appjail_inventree_jail_status.results | selectattr('rc', 'ne', 0) | list | length > 0
+
+- name: Apply pending Director changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Query Director project information
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail-director
+      - --env-file
+      - "{{ appjail_inventree_project_dir }}/.env"
+      - info
+      - --project
+      - "{{ appjail_inventree_project }}"
+  register: appjail_inventree_director_info
+  changed_when: false
+
+- name: Assert all Director services are running
+  ansible.builtin.assert:
+    that:
+      - "'FAILED' not in appjail_inventree_director_info.stdout"
+      - "'STOPPED' not in appjail_inventree_director_info.stdout"
+    fail_msg: >-
+      AppJail Director reports a failed or stopped service. Inspect Director and AppJail logs on the host.
+
+- name: Wait until the public InvenTree endpoint responds
+  ansible.builtin.uri:
+    url: "{{ appjail_inventree_public_url }}"
+    method: GET
+    status_code: [200, 301, 302, 403]
+    validate_certs: "{{ appjail_inventree_http_validate_certs }}"
+    return_content: false
+  register: appjail_inventree_http_check
+  retries: "{{ appjail_inventree_http_retries }}"
+  delay: "{{ appjail_inventree_http_delay }}"
+  until: appjail_inventree_http_check.status in [200, 301, 302, 403]
+  when: appjail_inventree_wait_for_http | bool

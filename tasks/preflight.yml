@@ -1,0 +1,110 @@
+---
+- name: Assert that the target is a supported FreeBSD host
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'FreeBSD'
+      - (ansible_facts.kernel | regex_search('^[0-9]+') | int) >= appjail_inventree_minimum_freebsd_major
+    fail_msg: >-
+      This role requires FreeBSD {{ appjail_inventree_minimum_freebsd_major }} or newer.
+
+- name: Assert required non-secret configuration
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_fqdn | length > 0
+      - appjail_inventree_public_url | length > 0
+      - appjail_inventree_admin_email | length > 0
+      - appjail_inventree_admin_email is match('^[^@\s]+@[^@\s]+\.[^@\s]+$')
+      - appjail_inventree_public_url is match('^https?://')
+      - appjail_inventree_fqdn is match('^[A-Za-z0-9.-]+$')
+      - appjail_inventree_network_cidr is match('^[0-9.]+/[0-9]+$')
+      - appjail_inventree_release_method in ['auto', 'www', 'pkgbase']
+      - appjail_inventree_expose is match('^[0-9]+:[0-9]+$')
+      - appjail_inventree_project is match('^[A-Za-z0-9][A-Za-z0-9_-]*$')
+    fail_msg: >-
+      Set fqdn, public_url, admin_email and a valid AppJail network before running the role.
+
+- name: Assert required secrets are defined
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_admin_password | length >= 16
+      - appjail_inventree_db_password | length >= 16
+      - appjail_inventree_db_root_password | length >= 16
+      - appjail_inventree_secret_key | length >= 32
+    fail_msg: >-
+      Define strong admin, database and secret-key values, preferably in an Ansible Vault file.
+  no_log: true
+
+- name: Validate custom environment variable names
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.value is defined
+      - item.name is match('^[A-Z_][A-Z0-9_]*$')
+    fail_msg: >-
+      Every extra environment item requires a shell-safe uppercase name and a value.
+  loop: "{{ appjail_inventree_extra_environment }}"
+  no_log: true
+
+- name: Assert TLS inputs are present when internal TLS is enabled
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_public_url is match('^https://')
+      - appjail_inventree_tls_certificate_src | length > 0
+      - appjail_inventree_tls_private_key_src | length > 0
+    fail_msg: Internal TLS requires an HTTPS public URL, certificate and private key.
+  when: appjail_inventree_tls_enabled | bool
+
+- name: Discover the default external interface
+  ansible.builtin.command:
+    argv:
+      - /sbin/route
+      - -n
+      - get
+      - default
+  register: appjail_inventree_route
+  changed_when: false
+  when: appjail_inventree_external_interface | length == 0
+
+- name: Set effective host facts
+  ansible.builtin.set_fact:
+    appjail_inventree_effective_external_interface: >-
+      {{ appjail_inventree_external_interface
+         if appjail_inventree_external_interface | length > 0
+         else ((appjail_inventree_route.stdout
+                | regex_findall('(?m)^\s*interface:\s*(\S+)') | first)
+               | default('')) }}
+    appjail_inventree_effective_release: >-
+      {{ appjail_inventree_release
+         if appjail_inventree_release | length > 0
+         else ((ansible_facts.kernel | regex_search('^[0-9]+'))
+               if (ansible_facts.kernel | regex_search('^[0-9]+') | int) >= 15
+               else (ansible_facts.kernel | regex_replace('-p[0-9]+$', ''))) }}
+    appjail_inventree_effective_release_method: >-
+      {{ appjail_inventree_release_method
+         if appjail_inventree_release_method != 'auto'
+         else ('pkgbase'
+               if (ansible_facts.kernel | regex_search('^[0-9]+') | int) >= 15
+               else 'www') }}
+
+- name: Assert that an external interface was determined
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_effective_external_interface | length > 0
+    fail_msg: Set appjail_inventree_external_interface explicitly; automatic detection failed.
+
+- name: Check that the selected external interface exists
+  ansible.builtin.command:
+    argv:
+      - /sbin/ifconfig
+      - "{{ appjail_inventree_effective_external_interface }}"
+  register: appjail_inventree_external_interface_check
+  changed_when: false
+  failed_when: false
+
+- name: Assert that the selected external interface exists
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_external_interface_check.rc == 0
+    fail_msg: >-
+      Network interface {{ appjail_inventree_effective_external_interface }} does not exist.
+      Leave appjail_inventree_external_interface empty to detect the default-route interface.

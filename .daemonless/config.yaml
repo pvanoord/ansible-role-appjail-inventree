@@ -1,0 +1,11 @@
+build:
+  variants:
+    - tag: "15.1"
+      containerfile: image/Containerfile
+      aliases: ["latest"]
+      default: true
+      args:
+        FREEBSD_RELEASE: "15.1"
+        INVENTREE_VERSION: "1.2.3"
+        UPSTREAM_COMMIT: "606b0bfc0a467dc683ea7e3330130173a27b2d6d"
+      cache_dirs: ["pkgcache0:/var/cache/pkg"]

@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: appjail_inventree
+  author: Peter van Oord van der Vlies
+  description: Deploy InvenTree with AppJail Director on FreeBSD.
+  license: BSD-3-Clause
+  min_ansible_version: "2.16"
+  platforms:
+    - name: FreeBSD
+      versions:
+        - all
+  galaxy_tags:
+    - freebsd
+    - appjail
+    - inventree
+dependencies: []

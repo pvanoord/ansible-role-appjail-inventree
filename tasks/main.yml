@@ -1,0 +1,23 @@
+---
+- name: Run preflight validation
+  ansible.builtin.import_tasks: preflight.yml
+  tags: [appjail_inventree, preflight]
+
+- name: Install AppJail dependencies
+  ansible.builtin.import_tasks: packages.yml
+  tags: [appjail_inventree, packages]
+
+- name: Configure the FreeBSD AppJail host
+  ansible.builtin.import_tasks: host.yml
+  tags: [appjail_inventree, host]
+
+- name: Flush host configuration handlers before deployment
+  ansible.builtin.meta: flush_handlers
+
+- name: Configure the InvenTree Director project
+  ansible.builtin.import_tasks: project.yml
+  tags: [appjail_inventree, project]
+
+- name: Deploy and verify the InvenTree stack
+  ansible.builtin.import_tasks: deploy.yml
+  tags: [appjail_inventree, deploy]

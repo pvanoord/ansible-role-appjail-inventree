@@ -1,0 +1,72 @@
+name: Build InvenTree FreeBSD OCI image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "image/**"
+      - ".daemonless/config.yaml"
+      - ".github/workflows/build-inventree-image.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "image/**"
+      - ".daemonless/config.yaml"
+      - ".github/workflows/build-inventree-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build and publish on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          DBUILD_REGISTRY: ghcr.io/itisit
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        with:
+          release: "15.1"
+          arch: x86-64
+          sync: rsync
+          usesh: true
+          envs: GITHUB_TOKEN GITHUB_ACTOR DBUILD_REGISTRY GITHUB_EVENT_NAME
+          prepare: |
+            set -e
+            dd if=/dev/zero of=/swapfile bs=1m count=4096
+            chmod 0600 /swapfile
+            mdconfig -a -t vnode -f /swapfile -u 0
+            swapon /dev/md0
+            mkdir -p /etc/pkg
+            sed -i "" -e 's|quarterly|latest|g' /etc/pkg/FreeBSD.conf
+            pkg update -f
+            pkg install -y podman jq skopeo buildah python312 py312-pyyaml
+            rm -rf /var/db/containers /var/lib/containers 2>/dev/null || true
+            kldload pf
+            sysctl net.inet.ip.forwarding=1
+            sysctl kern.ipc.shm_allow_removed=1
+            service linux onestart
+          run: |
+            set -e
+            mkdir -p /tmp/inventree-freebsd/.daemonless /tmp/inventree-freebsd/image
+            cp .daemonless/config.yaml /tmp/inventree-freebsd/.daemonless/config.yaml
+            cp -R image/. /tmp/inventree-freebsd/image/
+            cd /tmp/inventree-freebsd
+            fetch -qo /tmp/dbuild.tar.gz \
+              "https://github.com/daemonless/dbuild/archive/main.tar.gz"
+            mkdir -p /tmp/dbuild
+            tar -xzf /tmp/dbuild.tar.gz -C /tmp/dbuild --strip-components=1
+            export PYTHONPATH=/tmp/dbuild
+            python3.12 -m dbuild --version
+            python3.12 -m dbuild -v build --variant 15.1 --arch amd64
+            if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+              python3.12 -m dbuild -v push --variant 15.1 --arch amd64
+            fi

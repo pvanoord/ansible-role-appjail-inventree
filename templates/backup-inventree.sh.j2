@@ -1,0 +1,36 @@
+#!/bin/sh
+# Managed by Ansible. Contains a database credential; keep mode 0700.
+set -eu
+umask 077
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+export PATH
+
+backup_root={{ appjail_inventree_backup_dir | quote }}
+volume_root={{ appjail_inventree_volume_root | quote }}
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+work="${backup_root}/.${stamp}.tmp"
+final="${backup_root}/${stamp}"
+lock="${backup_root}/.backup.lock"
+
+if ! mkdir "${lock}" 2>/dev/null; then
+    echo "Another InvenTree backup is already active" >&2
+    exit 1
+fi
+trap 'rm -rf "${work}" "${lock}"' EXIT HUP INT TERM
+mkdir -p "${work}"
+
+appjail cmd jexec {{ appjail_inventree_db_jail_name | quote }} \
+    env MYSQL_PWD={{ appjail_inventree_db_password | quote }} \
+    {{ appjail_inventree_backup_dump_command | quote }} \
+    --single-transaction --routines --events \
+    --user={{ appjail_inventree_db_user | quote }} \
+    {{ appjail_inventree_db_name | quote }} \
+    > "${work}/database.sql"
+
+tar -C "${volume_root}/inventree" -czf "${work}/inventree-data.tar.gz" data
+sha256 "${work}/database.sql" "${work}/inventree-data.tar.gz" > "${work}/SHA256"
+mv "${work}" "${final}"
+trap 'rm -rf "${lock}"' EXIT HUP INT TERM
+find "${backup_root}" -mindepth 1 -maxdepth 1 -type d \
+    -mtime +{{ appjail_inventree_backup_retention_days }} -exec rm -rf {} +

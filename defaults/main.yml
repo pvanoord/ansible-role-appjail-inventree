@@ -1,0 +1,95 @@
+---
+# Package and host setup
+appjail_inventree_appjail_package: appjail-devel
+appjail_inventree_director_package: py312-director
+appjail_inventree_extra_packages:
+  - ca_root_nss
+  - dnsmasq
+  - git
+appjail_inventree_manage_host_networking: true
+appjail_inventree_manage_pf: true
+appjail_inventree_manage_dns: true
+appjail_inventree_enable_zfs: false
+appjail_inventree_external_interface: ""
+appjail_inventree_minimum_freebsd_major: 14
+appjail_inventree_release: ""
+appjail_inventree_release_method: auto
+appjail_inventree_update_release: false
+
+# AppJail virtual network and DNS
+appjail_inventree_network_name: default
+appjail_inventree_network_cidr: 10.77.0.0/24
+appjail_inventree_dns_interface: ajdns
+appjail_inventree_dns_clone_interface: tap0
+appjail_inventree_dns_address: 172.16.0.1
+appjail_inventree_shorten_domain_names: true
+
+# Project layout
+appjail_inventree_project: inventree
+appjail_inventree_project_dir: "/usr/local/etc/appjail/projects/{{ appjail_inventree_project }}"
+appjail_inventree_volume_root: "/var/appjail-volumes/{{ appjail_inventree_project }}"
+appjail_inventree_backup_dir: "/var/backups/{{ appjail_inventree_project }}"
+
+# AppJail service names
+appjail_inventree_jail_name: inventree
+appjail_inventree_db_jail_name: inventree-mariadb
+appjail_inventree_cache_jail_name: inventree-redis
+appjail_inventree_proxy_jail_name: inventree-nginx
+
+# InvenTree OCI image
+appjail_inventree_oci_image: ghcr.io/itisit/inventree-freebsd
+appjail_inventree_oci_tag: "15.1"
+
+# Makejail sources
+appjail_inventree_mariadb_makejail: gh+AppJail-makejails/mariadb
+appjail_inventree_redis_makejail: gh+AppJail-makejails/redis
+appjail_inventree_nginx_makejail: gh+AppJail-makejails/nginx
+appjail_inventree_platform_ui: true
+
+# Public endpoint and application settings
+appjail_inventree_fqdn: ""
+appjail_inventree_public_url: ""
+appjail_inventree_expose: "8080:80"
+appjail_inventree_language: en-US
+appjail_inventree_timezone: Europe/Amsterdam
+appjail_inventree_background_workers: 4
+appjail_inventree_gunicorn_workers: 3
+appjail_inventree_gunicorn_timeout: 120
+appjail_inventree_client_max_body_size: 100M
+appjail_inventree_trusted_origins: "{{ appjail_inventree_public_url }}"
+appjail_inventree_admin_user: admin
+appjail_inventree_admin_email: ""
+appjail_inventree_db_name: inventree
+appjail_inventree_db_user: inventree
+
+# Required secrets: store these with ansible-vault.
+appjail_inventree_admin_password: ""
+appjail_inventree_db_password: ""
+appjail_inventree_db_root_password: ""
+appjail_inventree_secret_key: ""
+
+# TLS is optional. When disabled, terminate TLS at an external reverse proxy.
+appjail_inventree_tls_enabled: false
+appjail_inventree_tls_expose: "8443:443"
+appjail_inventree_tls_certificate_src: ""
+appjail_inventree_tls_private_key_src: ""
+appjail_inventree_tls_certificate_name: fullchain.pem
+appjail_inventree_tls_private_key_name: privkey.pem
+appjail_inventree_tls_redirect_http: true
+
+# Optional application environment entries. Each item requires name and value.
+# Secrets placed here are written to the root-only .env file.
+appjail_inventree_extra_environment: []
+
+# Optional logical MariaDB + data-volume backup.
+appjail_inventree_backup_enabled: false
+appjail_inventree_backup_hour: "2"
+appjail_inventree_backup_minute: "30"
+appjail_inventree_backup_retention_days: 14
+appjail_inventree_backup_dump_command: mariadb-dump
+
+# Validation / deployment behavior
+appjail_inventree_wait_for_http: true
+appjail_inventree_http_validate_certs: true
+appjail_inventree_http_retries: 30
+appjail_inventree_http_delay: 10

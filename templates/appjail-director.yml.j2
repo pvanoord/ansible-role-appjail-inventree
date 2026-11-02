@@ -1,0 +1,102 @@
+---
+options:
+  - virtualnet: ':<random> {{ appjail_inventree_network_name }} default'
+  - nat:
+
+services:
+  inventree:
+    name: {{ appjail_inventree_jail_name }}
+    makejail: {{ appjail_inventree_project_dir }}/inventree-oci.Makejail
+    volumes:
+      - inventree-data: /inventree/data
+    oci:
+      environment:
+        - INVENTREE_ADMIN_USER: !ENV '${INVENTREE_ADMIN_USER}'
+        - INVENTREE_ADMIN_PASSWORD: !ENV '${INVENTREE_ADMIN_PASSWORD}'
+        - INVENTREE_ADMIN_EMAIL: !ENV '${INVENTREE_ADMIN_EMAIL}'
+        - INVENTREE_SECRET_KEY: !ENV '${INVENTREE_SECRET_KEY}'
+        - INVENTREE_TRUSTED_ORIGINS: !ENV '${INVENTREE_TRUSTED_ORIGINS}'
+        - INVENTREE_CACHE_HOST: '{{ appjail_inventree_cache_jail_name }}'
+        - INVENTREE_DEBUG: 'False'
+        - INVENTREE_DB_ENGINE: 'mysql'
+        - INVENTREE_DB_HOST: '{{ appjail_inventree_db_jail_name }}'
+        - INVENTREE_DB_PORT: '3306'
+        - INVENTREE_DB_NAME: '{{ appjail_inventree_db_name }}'
+        - INVENTREE_DB_USER: '{{ appjail_inventree_db_user }}'
+        - INVENTREE_DB_PASSWORD: !ENV '${INVENTREE_DB_PASSWORD}'
+        - INVENTREE_BACKGROUND_WORKERS: '{{ appjail_inventree_background_workers }}'
+        - INVENTREE_TIMEZONE: '{{ appjail_inventree_timezone }}'
+        - INVENTREE_LANGUAGE: '{{ appjail_inventree_language }}'
+        - INVENTREE_SITE_URL: '{{ appjail_inventree_public_url }}'
+        - INVENTREE_PLATFORM_UI: '{{ 1 if appjail_inventree_platform_ui | bool else 0 }}'
+        - INVENTREE_GUNICORN_WORKERS: '{{ appjail_inventree_gunicorn_workers }}'
+        - INVENTREE_GUNICORN_TIMEOUT: '{{ appjail_inventree_gunicorn_timeout }}'
+{% for variable in appjail_inventree_extra_environment %}
+        - {{ variable.name }}: !ENV '${EXTRA_{{ variable.name }}}'
+{% endfor %}
+    options:
+      - healthcheck: >-
+          health_cmd:jail:/inventree/init/check.sh
+          "recover_cmd:jail:su -l inventree -c /inventree/init/restart.sh"
+    scripts:
+      - type: local
+        text: service appjail-health onerestart
+
+  db:
+    name: {{ appjail_inventree_db_jail_name }}
+    makejail: {{ appjail_inventree_mariadb_makejail }}
+    priority: 97
+    oci:
+      environment:
+        - MARIADB_DATABASE: {{ appjail_inventree_db_name }}
+        - MARIADB_USER: {{ appjail_inventree_db_user }}
+        - MARIADB_PASSWORD: !ENV '${INVENTREE_DB_PASSWORD}'
+        - MARIADB_ROOT_PASSWORD: !ENV '${INVENTREE_DB_ROOT_PASSWORD}'
+    volumes:
+      - db: /var/db/mysql
+      - db-done: /.mariadb-done
+
+  cache:
+    name: {{ appjail_inventree_cache_jail_name }}
+    makejail: {{ appjail_inventree_redis_makejail }}
+    priority: 98
+
+  reverse-proxy:
+    name: {{ appjail_inventree_proxy_jail_name }}
+    makejail: {{ appjail_inventree_nginx_makejail }}
+    options:
+      - copydir: !ENV '${COPYDIR_FILES}'
+      - file: /usr/local/etc/nginx/nginx.conf
+{% if not appjail_inventree_tls_enabled | bool or appjail_inventree_tls_redirect_http | bool %}
+      - expose: '{{ appjail_inventree_expose }}'
+{% endif %}
+{% if appjail_inventree_tls_enabled | bool %}
+      - expose: '{{ appjail_inventree_tls_expose }}'
+{% endif %}
+    priority: 100
+    volumes:
+      - inventree-static: /usr/local/www/inventree/static
+      - inventree-media: /usr/local/www/inventree/media
+{% if appjail_inventree_tls_enabled | bool %}
+      - nginx-tls: /usr/local/etc/nginx/tls
+{% endif %}
+
+volumes:
+  inventree-data:
+    device: {{ appjail_inventree_volume_root }}/inventree/data
+    owner: 1001
+    group: 1001
+  inventree-static:
+    device: {{ appjail_inventree_volume_root }}/inventree/data/static
+  inventree-media:
+    device: {{ appjail_inventree_volume_root }}/inventree/data/media
+  db:
+    device: {{ appjail_inventree_volume_root }}/mariadb/db
+    owner: 88
+    group: 88
+  db-done:
+    device: {{ appjail_inventree_volume_root }}/mariadb/done
+{% if appjail_inventree_tls_enabled | bool %}
+  nginx-tls:
+    device: {{ appjail_inventree_volume_root }}/nginx/tls
+{% endif %}

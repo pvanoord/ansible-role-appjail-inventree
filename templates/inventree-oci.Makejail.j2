@@ -1,0 +1,6 @@
+ARG inventree_from={{ appjail_inventree_oci_image }}
+ARG inventree_tag={{ appjail_inventree_oci_tag }}
+
+OPTION container=boot
+OPTION overwrite=force
+OPTION from=${inventree_from}:${inventree_tag}

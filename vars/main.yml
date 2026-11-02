@@ -1,0 +1,9 @@
+---
+appjail_inventree_required_packages: "{{
+  [appjail_inventree_appjail_package, appjail_inventree_director_package]
+  + appjail_inventree_extra_packages }}"
+appjail_inventree_service_names:
+  - "{{ appjail_inventree_jail_name }}"
+  - "{{ appjail_inventree_db_jail_name }}"
+  - "{{ appjail_inventree_cache_jail_name }}"
+  - "{{ appjail_inventree_proxy_jail_name }}"

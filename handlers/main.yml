@@ -1,0 +1,38 @@
+---
+- name: Reload PF
+  ansible.builtin.service:
+    name: pf
+    state: reloaded
+
+- name: Restart dnsmasq
+  ansible.builtin.service:
+    name: dnsmasq
+    state: restarted
+
+- name: Restart AppJail DNS
+  ansible.builtin.service:
+    name: appjail-dns
+    state: restarted
+
+- name: Deploy InvenTree stack
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail-director
+      - --env-file
+      - "{{ appjail_inventree_project_dir }}/.env"
+      - up
+      - --file
+      - "{{ appjail_inventree_project_dir }}/appjail-director.yml"
+      - --project
+      - "{{ appjail_inventree_project }}"
+  environment:
+    PWD: "{{ appjail_inventree_project_dir }}"
+  changed_when: true
+
+- name: Restart InvenTree proxy
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/appjail
+      - restart
+      - "{{ appjail_inventree_proxy_jail_name }}"
+  changed_when: true

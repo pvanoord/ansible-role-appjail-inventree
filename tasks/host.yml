@@ -1,0 +1,327 @@
+---
+- name: Check whether the host has a local timezone file
+  ansible.builtin.stat:
+    path: /etc/localtime
+  register: appjail_inventree_localtime
+
+- name: Check for the configured timezone data
+  ansible.builtin.stat:
+    path: "/usr/share/zoneinfo/{{ appjail_inventree_timezone }}"
+  register: appjail_inventree_timezone_data
+  when: not appjail_inventree_localtime.stat.exists
+
+- name: Require timezone data when the host has no localtime file
+  ansible.builtin.assert:
+    that:
+      - appjail_inventree_timezone_data.stat.exists
+      - appjail_inventree_timezone_data.stat.isreg
+    fail_msg: >-
+      /etc/localtime is missing and
+      /usr/share/zoneinfo/{{ appjail_inventree_timezone }} is unavailable.
+      Install timezone data or set appjail_inventree_timezone to an installed zone.
+  when: not appjail_inventree_localtime.stat.exists
+
+- name: Create the host localtime link when it is missing
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ appjail_inventree_timezone }}"
+    dest: /etc/localtime
+    state: link
+    owner: root
+    group: wheel
+  when: not appjail_inventree_localtime.stat.exists
+
+- name: Configure required rc.conf settings
+  ansible.builtin.include_tasks: rcconf.yml
+  loop:
+    - {key: appjail_enable, value: 'YES'}
+    - {key: appjail_health_enable, value: 'YES'}
+    - {key: gateway_enable, value: 'YES'}
+  loop_control:
+    loop_var: appjail_inventree_rc_item
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Configure PF rc.conf settings
+  ansible.builtin.include_tasks: rcconf.yml
+  loop:
+    - {key: pf_enable, value: 'YES', notify: Reload PF}
+    - {key: pflog_enable, value: 'YES'}
+  loop_control:
+    loop_var: appjail_inventree_rc_item
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_pf | bool
+
+- name: Configure AppJail DNS rc.conf settings
+  ansible.builtin.include_tasks: rcconf.yml
+  loop:
+    - {key: appjail_dns_enable, value: 'YES', notify: Restart AppJail DNS}
+    - {key: dnsmasq_enable, value: 'YES', notify: Restart dnsmasq}
+    - key: dnsmasq_conf
+      value: /usr/local/share/appjail/files/dnsmasq.conf
+      notify: Restart dnsmasq
+    - key: "ifconfig_{{ appjail_inventree_dns_clone_interface }}_name"
+      value: "{{ appjail_inventree_dns_interface }}"
+    - key: "ifconfig_{{ appjail_inventree_dns_interface }}"
+      value: "inet {{ appjail_inventree_dns_address }}/32"
+  loop_control:
+    loop_var: appjail_inventree_rc_item
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_dns | bool
+
+- name: Read configured cloned interfaces
+  ansible.builtin.command:
+    argv: [/usr/sbin/sysrc, -n, cloned_interfaces]
+  register: appjail_inventree_cloned_interfaces
+  changed_when: false
+  failed_when: appjail_inventree_cloned_interfaces.rc not in [0, 1]
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_dns | bool
+
+- name: Add the AppJail DNS clone interface
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/sysrc
+      - "cloned_interfaces+={{ appjail_inventree_dns_clone_interface }}"
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_dns | bool
+    - appjail_inventree_dns_clone_interface not in (appjail_inventree_cloned_interfaces.stdout | split)
+  changed_when: true
+
+- name: Load required network kernel modules at boot
+  ansible.builtin.lineinfile:
+    path: /boot/loader.conf
+    regexp: "^{{ item }}_load="
+    line: "{{ item }}_load=\"YES\""
+    create: true
+    mode: "0644"
+  loop:
+    - if_bridge
+    - bridgestp
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Load required network kernel modules now
+  ansible.builtin.command:
+    argv: [/sbin/kldload, "{{ item }}"]
+  register: appjail_inventree_kldload
+  changed_when: appjail_inventree_kldload.rc == 0
+  failed_when:
+    - appjail_inventree_kldload.rc != 0
+    - "'module already loaded' not in appjail_inventree_kldload.stderr"
+    - "'File exists' not in appjail_inventree_kldload.stderr"
+  loop:
+    - if_bridge
+    - bridgestp
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Load the PF kernel module at boot
+  ansible.builtin.lineinfile:
+    path: /boot/loader.conf
+    regexp: '^pf_load='
+    line: 'pf_load="YES"'
+    create: true
+    mode: "0644"
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_pf | bool
+
+- name: Load the PF kernel module now
+  ansible.builtin.command:
+    argv: [/sbin/kldload, pf]
+  register: appjail_inventree_pf_kldload
+  changed_when: appjail_inventree_pf_kldload.rc == 0
+  failed_when:
+    - appjail_inventree_pf_kldload.rc != 0
+    - "'module already loaded' not in appjail_inventree_pf_kldload.stderr"
+    - "'File exists' not in appjail_inventree_pf_kldload.stderr"
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_pf | bool
+
+- name: Persist IPv4 forwarding
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^net\.inet\.ip\.forwarding='
+    line: net.inet.ip.forwarding=1
+    create: true
+    mode: "0644"
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Persist bridge packet-filtering settings
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    regexp: "^{{ item.key | regex_escape }}="
+    line: "{{ item.key }}={{ item.value }}"
+    create: true
+    mode: "0644"
+  loop:
+    - {key: net.link.bridge.pfil_member, value: '1'}
+    - {key: net.link.bridge.pfil_bridge, value: '1'}
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Read current bridge packet-filtering settings
+  ansible.builtin.command:
+    argv: [/sbin/sysctl, -n, "{{ item.key }}"]
+  loop:
+    - {key: net.link.bridge.pfil_member, value: '1'}
+    - {key: net.link.bridge.pfil_bridge, value: '1'}
+  register: appjail_inventree_bridge_sysctls
+  changed_when: false
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Enable bridge packet filtering now
+  ansible.builtin.command:
+    argv: [/sbin/sysctl, "{{ item.item.key }}={{ item.item.value }}"]
+  loop: "{{ appjail_inventree_bridge_sysctls.results | default([]) }}"
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - item.stdout | trim != item.item.value
+  changed_when: true
+
+- name: Read current IPv4 forwarding state
+  ansible.builtin.command:
+    argv: [/sbin/sysctl, -n, net.inet.ip.forwarding]
+  register: appjail_inventree_forwarding
+  changed_when: false
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: Enable IPv4 forwarding now
+  ansible.builtin.command:
+    argv: [/sbin/sysctl, net.inet.ip.forwarding=1]
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_forwarding.stdout | trim != '1'
+  changed_when: true
+
+- name: Add AppJail PF anchors without replacing the host ruleset
+  ansible.builtin.blockinfile:
+    path: /etc/pf.conf
+    marker: "# {mark} ANSIBLE MANAGED APPJAIL ANCHORS"
+    block: |
+      nat-anchor "appjail-nat/jail/*"
+      nat-anchor "appjail-nat/network/*"
+      rdr-anchor "appjail-rdr/*"
+    create: true
+    mode: "0600"
+    validate: /sbin/pfctl -nf %s
+  notify: Reload PF
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_pf | bool
+
+- name: Create AppJail configuration directory
+  ansible.builtin.file:
+    path: /usr/local/etc/appjail
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0755"
+
+- name: Configure AppJail
+  ansible.builtin.template:
+    src: appjail.conf.j2
+    dest: /usr/local/etc/appjail/appjail.conf
+    owner: root
+    group: wheel
+    mode: "0644"
+
+- name: Configure resolver used by new jails
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: /usr/local/etc/appjail/resolv.conf
+    owner: root
+    group: wheel
+    mode: "0644"
+  when: appjail_inventree_manage_dns | bool
+
+- name: Create the AppJail DNS hosts file
+  ansible.builtin.file:
+    path: /var/tmp/appjail-hosts
+    state: touch
+    owner: root
+    group: wheel
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve
+  when: appjail_inventree_manage_dns | bool
+
+- name: Check the AppJail DNS interface
+  ansible.builtin.command:
+    argv: [/sbin/ifconfig, "{{ appjail_inventree_dns_interface }}"]
+  register: appjail_inventree_dns_if_status
+  changed_when: false
+  failed_when: false
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_dns | bool
+
+- name: Create and start the AppJail DNS interface
+  ansible.builtin.shell: |
+    set -eu
+    service netif cloneup
+    service netif start {{ appjail_inventree_dns_interface | quote }}
+  args:
+    executable: /bin/sh
+  changed_when: true
+  when:
+    - appjail_inventree_manage_host_networking | bool
+    - appjail_inventree_manage_dns | bool
+    - appjail_inventree_dns_if_status.rc != 0
+
+- name: Start required host services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+  loop: >-
+    {{ ['appjail', 'appjail-health']
+       + (['pf', 'pflog'] if appjail_inventree_manage_pf | bool else [])
+       + (['dnsmasq', 'appjail-dns'] if appjail_inventree_manage_dns | bool else []) }}
+  when: appjail_inventree_manage_host_networking | bool
+
+- name: List bootstrapped AppJail releases
+  ansible.builtin.command:
+    argv: [/usr/local/bin/appjail, fetch, list]
+  register: appjail_inventree_releases
+  changed_when: false
+
+- name: Bootstrap the configured FreeBSD release
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail
+      - fetch
+      - "{{ appjail_inventree_effective_release_method }}"
+      - -v
+      - "{{ appjail_inventree_effective_release }}"
+  when: appjail_inventree_effective_release not in appjail_inventree_releases.stdout
+  changed_when: true
+
+- name: Update the pkgbase AppJail release when explicitly requested
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/appjail
+      - fetch
+      - update
+      - release
+      - -v
+      - "{{ appjail_inventree_effective_release }}"
+  when:
+    - appjail_inventree_update_release | bool
+    - appjail_inventree_effective_release_method == 'pkgbase'
+  changed_when: true
+
+- name: Update the distribution-set AppJail release when explicitly requested
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/env
+      - PAGER=cat
+      - /usr/local/bin/appjail
+      - update
+      - release
+      - -v
+      - "{{ appjail_inventree_effective_release }}"
+  when:
+    - appjail_inventree_update_release | bool
+    - appjail_inventree_effective_release_method == 'www'
+  changed_when: true

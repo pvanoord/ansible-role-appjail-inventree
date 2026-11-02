@@ -1,0 +1,16 @@
+# Managed by Ansible: appjail_inventree
+EXT_IF={{ appjail_inventree_effective_external_interface }}
+ON_IF={{ appjail_inventree_effective_external_interface }}
+FREEBSD_VERSION={{ appjail_inventree_effective_release }}
+FREEBSD_ARCH={{ ansible_facts.machine }}
+IMAGE_ARCH={{ ansible_facts.machine }}
+AUTO_NETWORK_NAME={{ appjail_inventree_network_name }}
+AUTO_NETWORK_ADDR={{ appjail_inventree_network_cidr }}
+SHORTEN_DOMAIN_NAMES={{ 1 if appjail_inventree_shorten_domain_names | bool else 0 }}
+NETWORK_TO_SHORTEN={{ appjail_inventree_network_name }}
+{% if appjail_inventree_manage_dns | bool %}
+DEFAULT_RESOLV_CONF=/usr/local/etc/appjail/resolv.conf
+{% endif %}
+{% if appjail_inventree_enable_zfs | bool %}
+ENABLE_ZFS=1
+{% endif %}

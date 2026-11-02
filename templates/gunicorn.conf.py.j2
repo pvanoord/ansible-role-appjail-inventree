@@ -1,0 +1,7 @@
+# Managed by Ansible: appjail_inventree
+bind = "0.0.0.0:8000"
+workers = {{ appjail_inventree_gunicorn_workers }}
+timeout = {{ appjail_inventree_gunicorn_timeout }}
+accesslog = "-"
+errorlog = "-"
+capture_output = True

@@ -1,0 +1,5 @@
+---
+- name: Install required FreeBSD packages
+  ansible.builtin.package:
+    name: "{{ appjail_inventree_required_packages }}"
+    state: present
