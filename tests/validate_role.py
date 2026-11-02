@@ -198,6 +198,8 @@ def main() -> int:
         errors.append("Image workflow must build from the inventree-freebsd directory")
     if "arch: x86-64" in workflow:
         errors.append("Image workflow must use the FreeBSD VM action's default x86_64 architecture")
+    if "mkdir -p /var/cache/dbuild/pkgcache0" not in workflow:
+        errors.append("Image workflow must create the dbuild package cache mount")
 
     if errors:
         print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)

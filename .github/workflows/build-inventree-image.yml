@@ -53,6 +53,7 @@ jobs:
             sysctl net.inet.ip.forwarding=1
             sysctl kern.ipc.shm_allow_removed=1
             service linux onestart
+            mkdir -p /var/cache/dbuild/pkgcache0
           run: |
             set -e
             mkdir -p /tmp/inventree-freebsd/.daemonless /tmp/inventree-freebsd/image
