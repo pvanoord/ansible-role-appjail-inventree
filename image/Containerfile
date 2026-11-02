@@ -57,6 +57,8 @@ RUN set -eux; \
 
 USER inventree
 
+ENV HOME=/inventree
+
 RUN set -eux; \
     python3.12 -m ensurepip --default-pip; \
     python3.12 -m pip install --upgrade pip; \
@@ -74,7 +76,8 @@ COPY image/run-worker.sh /usr/local/bin/inventree-run-worker
 RUN chmod 0555 /usr/local/bin/inventree-entrypoint \
         /usr/local/bin/inventree-run-web /usr/local/bin/inventree-run-worker
 
-ENV PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/inventree/.local/bin"
+ENV HOME=/inventree \
+    PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/inventree/.local/bin"
 VOLUME ["/inventree/data"]
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/inventree-entrypoint"]
